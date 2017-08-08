@@ -13,7 +13,8 @@ c = conn.cursor()
 
 # Create table
 c.execute('''CREATE TABLE IF NOT EXISTS grupos
-             (id int, link text, fecha text, user text)''')
+             (id int, link text, fechaPrimero text, fechaUltimo text,
+              userPrimero text, userUltimo text, contador int)''')
 conn.commit()
 
 with open("./old.TOKEN", "r") as TOKEN:
@@ -33,7 +34,7 @@ def listener(messages):
     for m in messages:
         if m.content_type == 'text':
             # print the sent message to the console
-            print (str(m.chat.first_name) + " [" + str(m.chat.id) + "]: " + m.text)
+            print (str(m.from_user.username) + " [" + str(m.chat.id) + "]: " + m.text)
 
 # Create bot
 bot.set_update_listener(listener)
@@ -45,21 +46,37 @@ def start(message):
 
 @bot.message_handler(content_types=['text'])
 def new_link(message):
-    print str(message.from_user.username)
     match = re.search('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', message.text)
     if match is not None:
         link = match.group(0)
         chat_id = message.chat.id
         dentro = c.execute("SELECT link FROM grupos WHERE id = " + str(chat_id) + " AND link = \'" + link + "\'")
         if dentro.fetchone() is not None:
-            fecha =  c.execute("SELECT fecha FROM grupos WHERE id = " + str(chat_id) + " AND link = \"" + link + "\"")
-            fechaTexto = fecha.fetchone()[0]
-            user =  c.execute("SELECT user FROM grupos WHERE id = " + str(chat_id) + " AND link = \"" + link + "\"")
-            userTexto = user.fetchone()[0]
-            bot.reply_to(message, u"Old... Este mensaje fue enviado el " + fechaTexto + " por " + userTexto)
+            fechaPrimero =  c.execute("SELECT fechaPrimero FROM grupos WHERE id = " + str(chat_id) + " AND link = \"" + link + "\"")
+            fechaPrimeroTexto = fechaPrimero.fetchone()[0]
+            userPrimero =  c.execute("SELECT userPrimero FROM grupos WHERE id = " + str(chat_id) + " AND link = \"" + link + "\"")
+            userPrimeroTexto = userPrimero.fetchone()[0]
+            fechaUltimo =  c.execute("SELECT fechaUltimo FROM grupos WHERE id = " + str(chat_id) + " AND link = \"" + link + "\"")
+            fechaUltimoTexto = fechaUltimo.fetchone()[0]
+            userUltimo =  c.execute("SELECT userUltimo FROM grupos WHERE id = " + str(chat_id) + " AND link = \"" + link + "\"")
+            userUltimoTexto = userUltimo.fetchone()[0]
+            contador =  c.execute("SELECT contador FROM grupos WHERE id = " + str(chat_id) + " AND link = \"" + link + "\"")
+            contadorTexto = contador.fetchone()[0]
+            print contadorTexto
+            if contadorTexto == 1:
+                bot.reply_to(message, u"OOOLD... \nEste mensaje fue enviado originalmente el " + fechaPrimeroTexto + " por @" + userPrimeroTexto +
+                             ". \nSe ha enviado un total de " + str(contadorTexto) + " vez.")
+            else:
+                bot.reply_to(message, u"OOOLD... \nEste mensaje fue enviado originalmente el " + fechaPrimeroTexto + " por @" + userPrimeroTexto +
+                             " y por ultima vez  el " + fechaUltimoTexto + " por @" + userUltimoTexto + 
+                             ". \nSe ha enviado un total de " + str(contadorTexto) + " veces.")
+            cnt = int(contadorTexto) + 1    
+            datos = [(str(cnt) , str(message.from_user.username) , time.strftime("%d/%m/%Y a las %H:%M") , str(chat_id)),]
+            c.executemany("UPDATE grupos SET contador = ? , userUltimo = ? , fechaUltimo = ? WHERE id = ?", datos)
+            conn.commit()
         else:
-            valor = [(chat_id,link,time.strftime("%d/%m/%Y a las %H:%M"),str(message.from_user.username)),]
-            c.executemany("INSERT INTO grupos VALUES (?,?,?,?)", valor)
+            valor = [(chat_id,link,time.strftime("%d/%m/%Y a las %H:%M"),time.strftime("%d/%m/%Y a las %H:%M"), str(message.from_user.username), str(message.from_user.username), "1"),]
+            c.executemany("INSERT INTO grupos VALUES (?,?,?,?,?,?,?)", valor)
             conn.commit()
 
 # Ignora mensajes antiguos
